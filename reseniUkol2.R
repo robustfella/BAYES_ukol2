@@ -5,19 +5,19 @@ library(tidyverse)
 set.seed(69)
 n <- 30
 p_uspech <- 0.35
-real_array <- data.frame(mu = rbinom(2000,n,p_uspech))
+real_array <- data.frame(mu = rbinom(1,n,p_uspech))
 ggplot(data = real_array, aes(x=mu))+
   geom_histogram(aes(y=..density..),color="white", bins=15)
-
+simulated_p <- mean(real_array$mu)/30
 
 one_iteration <- function(a, b, current){
   # STEP 1: Propose the next chain location
   proposal <- rbeta(1, a, b)
   
   # STEP 2: Decide whether or not to go there
-  proposal_plaus <- dbeta(proposal, 2, 3) * dbinom(1, 2, proposal)
+  proposal_plaus <- dbeta(proposal, 3, 1) * dbinom(11, 30, proposal)
   proposal_q     <- dbeta(proposal, a, b)
-  current_plaus  <- dbeta(current, 2, 3) * dbinom(1, 2, current)
+  current_plaus  <- dbeta(current, 3, 1) * dbinom(11, 30, current)
   current_q      <- dbeta(current, a, b)
   alpha <- min(1, proposal_plaus / current_plaus * current_q / proposal_q)
   next_stop <- sample(c(proposal, current), 
@@ -48,16 +48,18 @@ betabin_tour <- function(N, a, b){
   return(data.frame(iteration = c(1:N), pi))
 }
 
-a <- 2; b <- 5; y <- real_array$mu
-betabin_sim <- betabin_tour(N = 5000, a = a, b = b)
-mean(betabin_sim$p)
-hist(betabin_sim$p, breaks = 30, main = "Posterior of p", xlab = "p")
+a <- 3; b <- 1; y <- real_array$mu
+post_a <- 3 + y
+post_b <- 1 + n - y
+betabin_sim <- betabin_tour(N = 2000, a = a, b = b)
+posterior_p <- mean(betabin_sim$pi)
+hist(betabin_sim$pi, breaks = 30, main = "Posterior of p", xlab = "p")
 
 ggplot(betabin_sim, aes(x = iteration, y = pi)) + 
   geom_line()
 ggplot(betabin_sim, aes(x = pi)) + 
   geom_histogram(aes(y = ..density..), color = "white") + 
-  stat_function(fun = dbeta, args = list(3, 4), color = "blue")
+  stat_function(fun = dbeta, args = list(post_a, post_b), color = "blue")
 
 # 2 Jenda
 
