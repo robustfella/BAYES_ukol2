@@ -65,4 +65,45 @@ ggplot(betabin_sim, aes(x = pi)) +
 
 
 # 3 Anička
+
 # 4 Petr a Honza
+
+library(bayesrules)
+library(rstan)
+library(dplyr)
+library(tidybayes)
+library(ggplot2)
+library(glue)
+
+data(loons)
+
+# 8.21
+
+# 8.21c: Počet datových bodů
+n_obs <- nrow(loons)
+
+# průměrný počet loonů na 100 hodin
+mean_count_100 <- mean(loons$count_per_100)
+
+print(paste("8.21c - Počet datových bodů (n):", n_obs))
+print(paste("8.21c - Průměrný počet loonů na 100 hodin:", mean_count_100))
+
+# 8.21d
+
+alpha0 <- 4
+beta0  <- 2
+
+y <- loons$count_per_100
+n  <- length(y)
+S  <- sum(y)
+
+alpha_post <- alpha0 + S
+beta_post  <- beta0 + n
+
+# 95% posteriorní interval
+ci_95 <- qgamma(c(0.025, 0.975),
+                shape = alpha_post,
+                rate  = beta_post)
+
+print("95% posteriorní interval:")
+print(ci_95)
