@@ -146,4 +146,143 @@ qnorm(c(0.025,0.975),y,0.5320898)
 #8.20
 #c
 pnorm(220, y, sd = 0.5320898) - pnorm(200, y, sd = 0.5320898)
+
 # 4 Petr a Honza
+
+library(bayesrules)
+library(rstan)
+library(dplyr)
+library(tidybayes)
+library(ggplot2)
+library(glue)
+
+data(loons)
+
+# 8.21
+
+# 8.21c: Počet datových bodů
+n_obs <- nrow(loons)
+
+# průměrný počet loonů na 100 hodin
+mean_count_100 <- mean(loons$count_per_100)
+
+print(paste("8.21c - Počet datových bodů (n):", n_obs))
+print(paste("8.21c - Průměrný počet loonů na 100 hodin:", mean_count_100))
+
+# 8.21d
+
+alpha0 <- 4
+beta0  <- 2
+
+y <- loons$count_per_100
+n  <- length(y)
+S  <- sum(y)
+
+alpha_post <- alpha0 + S
+beta_post  <- beta0 + n
+
+# 95% posteriorní interval
+ci95 <- qgamma(c(0.025, 0.975),
+                shape = alpha_post,
+                rate  = beta_post)
+
+print("95% posteriorní interval:")
+print(ci95)
+
+# 8.22b
+ci95[2] < 1   # je horní mez pod 1?
+
+# 8.22c
+post_prob_lambda_lt_1 <- pgamma(1, shape = alpha_post, rate = beta_post)
+post_prob_lambda_lt_1
+
+# 8.23a
+library(rstan)
+
+stan_code <- "
+data {
+  int<lower=1> n;
+  int<lower=0> y[n];
+}
+parameters {
+  real<lower=0> lambda;
+}
+model {
+  // prior
+  lambda ~ gamma(4, 2);      // shape = 4, rate = 2
+  
+  // likelihood
+  y ~ poisson(lambda);
+}
+"
+
+# připrava dat pro Stan
+y <- loons$count_per_100  
+stan_data <- list(
+  n = length(y),
+  y = as.integer(y)
+)
+
+# spuštění MCMC
+fit_loons <- stan(model_code = stan_code,
+                  data  = stan_data,
+                  chains = 4,
+                  iter   = 10000,
+                  warmup = 2000,
+                  seed   = 123)
+
+# 8.23b
+
+library(bayesplot)
+library(broom.mixed)
+
+# základní souhrn
+print(fit_loons, pars = "lambda")
+
+# trace plot
+mcmc_trace(as.array(fit_loons), pars = "lambda")
+
+# autocorrelation
+mcmc_acf_bar(as.array(fit_loons), pars = "lambda")
+
+# 8.23c
+
+post_draws <- extract(fit_loons, pars = "lambda")$lambda
+
+ci_95_mcmc <- quantile(post_draws, probs = c(0.025, 0.975))
+ci_95_mcmc
+ci_95
+
+# 8.23d
+post_prob_lambda_lt_1_mcmc <- mean(post_draws < 1)
+post_prob_lambda_lt_1_mcmc
+post_prob_lambda_lt_1
+
+# 8.24a
+
+set.seed(123)
+y_rep <- rpois(length(post_draws), lambda = post_draws)
+
+# histogram posteriorně prediktivního rozdělení
+library(ggplot2)
+
+ggplot(data.frame(y_rep = y_rep),
+       aes(x = y_rep)) +
+  geom_histogram(binwidth = 1, boundary = -0.5) +
+  labs(x = "Počet loonů v dalším 100-hodinovém období",
+       y = "Posteriorní hustota (počty simulací)",
+       title = "Posteriorně prediktivní rozdělení Y'")
+
+# 8.24b
+
+pred_summary <- c(
+  mean = mean(y_rep),
+  sd   = sd(y_rep),
+  q025 = quantile(y_rep, 0.025),
+  q975 = quantile(y_rep, 0.975)
+)
+pred_summary
+
+# 8.24c
+prob_Yrep_eq_0 <- mean(y_rep == 0)
+prob_Yrep_eq_0
