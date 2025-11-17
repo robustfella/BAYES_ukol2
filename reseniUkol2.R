@@ -1,6 +1,8 @@
 library(bayesrules)
 library(tidyverse)
+#====================================================================
 # 1 Jenda
+#====================================================================
 # generování dat
 set.seed(69)
 n <- 30
@@ -27,7 +29,7 @@ one_iteration <- function(a, b, current){
 }
 betabin_tour <- function(N, a, b){
   # 1. Start the chain at location 0.5
-  current <- 0.5
+  current <- 0.3
   
   # 2. Initialize the simulation
   pi <- rep(0, N)
@@ -60,9 +62,65 @@ ggplot(betabin_sim, aes(x = iteration, y = pi)) +
 ggplot(betabin_sim, aes(x = pi)) + 
   geom_histogram(aes(y = ..density..), color = "white") + 
   stat_function(fun = dbeta, args = list(post_a, post_b), color = "blue")
-
+#====================================================================
 # 2 Jenda
+#====================================================================
+one_mh_iteration_normal <- function(w, current){
+  # STEP 1: Propose the next chain location
+  proposal <- runif(1, min = current - w, max = current + w)
+  
+  # STEP 2: Decide whether or not to go there
+  proposal_plaus <- dnorm(proposal, 70, 10) * dnorm(77.88, proposal, 0.77)
+  current_plaus  <- dnorm(current, 70, 10) * dnorm(77.88, current, 0.77)
+  alpha <- min(1, proposal_plaus / current_plaus)
+  next_stop <- sample(c(proposal, current), 
+                      size = 1, prob = c(alpha, 1-alpha))
+  
+  # Return the results
+  return(data.frame(proposal, alpha, next_stop))
+}
+mh_tour_normal <- function(N, w){
+  # 1. Start the chain at location 3
+  current <- 70
+  
+  # 2. Initialize the simulation
+  mu <- rep(0, N)
+  
+  # 3. Simulate N Markov chain stops
+  for(i in 1:N){    
+    # Simulate one iteration
+    sim <- one_mh_iteration_normal(w = w, current = current)
+    
+    # Record next location
+    mu[i] <- sim$next_stop
+    
+    # Reset the current location
+    current <- sim$next_stop
+  }
+  
+  # 4. Return the chain locations
+  return(data.frame(iteration = c(1:N), mu))
+}
+data("airquality")
+y <- airquality$Temp
+y <- na.omit(y)
 
+n <- length(y)
+y_bar <- mean(y)
+s <- sd(y)
+se <- s/sqrt(n)
+sigma <- s^2
 
+normalnormal_model = summarize_normal_normal(mean = 70, sd = 10, sigma = s, n=n,y_bar = y_bar)
+
+normalnormal_chain <- mh_tour_normal(N = 2000, w = 1)
+posterior_p <- mean(normalnormal_chain$mu)
+hist(normalnormal_chain$mu, breaks = 30, main = "Posterior of μ", xlab = "μ")
+
+ggplot(normalnormal_chain, aes(x = iteration, y = mu)) + 
+  geom_line()
+ggplot(normalnormal_chain, aes(x = mu)) + 
+  geom_histogram(aes(y = ..density..), color = "white") + 
+  stat_function(fun = dnorm, args = list(mean = normalnormal_model$mean[2], sd = normalnormal_model$sd[2]), color = "blue")
 # 3 Anička
 # 4 Petr a Honza
